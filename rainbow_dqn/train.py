@@ -1,9 +1,7 @@
 import argparse
-from dataclasses import asdict
 from pathlib import Path
 
 import gymnasium as gym
-import wandb
 from gymnasium import spaces
 
 import tetris_rl  # noqa: F401 (registers envs)
@@ -51,7 +49,6 @@ def train(
     env: gym.Env,
     eval_env: gym.Env,
     config: RDQNConfig,
-    wandb_run_id: str,
     start_step: int = 0,
 ) -> None:
     update_steps = 0
@@ -79,23 +76,14 @@ def train(
 
         if (step + 1) % config.eval_period == 0:
             avg_reward, avg_info = evaluate(agent, eval_env, config.eval_episodes)
-            print(f"Eval at step {step + 1}: avg_reward = {avg_reward}")
-            wandb.log(
-                {
-                    "train/loss": loss,
-                    "train/beta": agent.beta,
-                    "eval/avg_reward": avg_reward,
-                    **{f"eval/avg_{key}": value for key, value in avg_info.items()},
-                },
-                step=step + 1,
-            )
+            print(f"Eval at step {step + 1}: avg_reward = {avg_reward}, {avg_info}")
 
         if (step + 1) % config.checkpoint_period == 0:
-            save_agent(agent, SAVE_PATH, step + 1, env, wandb_run_id=wandb_run_id)
+            save_agent(agent, SAVE_PATH, step + 1, env)
             print(f"Checkpointed at step {step + 1} -> {SAVE_PATH}")
         if (step + 1) % config.snapshot_period == 0:
             path = snapshot_path(step + 1)
-            save_agent(agent, path, step + 1, env, wandb_run_id=wandb_run_id)
+            save_agent(agent, path, step + 1, env)
             print(f"Snapshotted at step {step + 1} -> {path}")
 
 
@@ -116,31 +104,17 @@ def main() -> None:
 
     n_features, n_actions = feat_space.shape[1], int(action_space.n)
     if args.resume:
-        agent, start_step, wandb_run_id = load_agent(
-            SAVE_PATH, n_features, n_actions, env=env
-        )
+        agent, start_step = load_agent(SAVE_PATH, n_features, n_actions, env=env)
         config = agent.config
         print(f"Resumed from {SAVE_PATH} at step {start_step}")
     else:
         config = RDQNConfig(use_topout_mask=args.topout_mask)
         agent = RDQNAgent(n_features, n_actions, config)
         start_step = 0
-        wandb_run_id = None
-
-    wandb.init(
-        project="tetris-dqn",
-        tags=["rainbow"],
-        config={**asdict(config), "variant": "rainbow"},
-        id=wandb_run_id,
-        resume="allow" if args.resume else None,
-    )
-    assert wandb.run is not None
-    wandb_run_id = wandb.run.id
 
     agent.train()
-    train(agent, env, eval_env, config, wandb_run_id, start_step)
-    save_agent(agent, SAVE_PATH, config.max_steps, env, wandb_run_id=wandb_run_id)
-    wandb.finish()
+    train(agent, env, eval_env, config, start_step)
+    save_agent(agent, SAVE_PATH, config.max_steps, env)
 
 
 if __name__ == "__main__":

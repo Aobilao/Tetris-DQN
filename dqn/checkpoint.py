@@ -7,11 +7,7 @@ from dqn.agent import DQNAgent
 
 
 def save_agent(
-    agent: DQNAgent,
-    path: str,
-    step: int = 0,
-    env: gym.Env | None = None,
-    wandb_run_id: str | None = None,
+    agent: DQNAgent, path: str, step: int = 0, env: gym.Env | None = None
 ) -> None:
     torch.save(
         {
@@ -25,7 +21,6 @@ def save_agent(
             "buffer": agent.buffer,
             "normalizer": agent.normalizer,
             "epsilon": agent.epsilon,
-            "wandb_run_id": wandb_run_id,
         },
         path,
     )
@@ -37,7 +32,7 @@ def load_agent(
     n_actions: int,
     device: torch.device = torch.device("cpu"),
     env: gym.Env | None = None,
-) -> tuple[DQNAgent, int, str | None]:
+) -> tuple[DQNAgent, int]:
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     agent = DQNAgent(n_features, n_actions, ckpt["config"], device)
     agent.online.load_state_dict(ckpt["online_state_dict"])
@@ -49,7 +44,7 @@ def load_agent(
     agent.epsilon = ckpt["epsilon"]
     if env is not None and ckpt.get("env_rng") is not None:
         env.unwrapped.np_random = ckpt["env_rng"]
-    return agent, int(ckpt["step"]), ckpt.get("wandb_run_id")
+    return agent, int(ckpt["step"])
 
 
 def load_policy(
