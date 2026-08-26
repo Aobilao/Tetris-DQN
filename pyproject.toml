@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tetris-rl"
+version = "0.1.0"
+description = "Afterstate Tetris environment for reinforcement learning"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "gymnasium>=1.0", "jaxtyping>=0.2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["tetris_rl"]
+
+[tool.pyright]
+typeCheckingMode = "basic"
+include = ["tetris_rl", "dqn", "tests", "examples", "rainbow_dqn"]
+
+[tool.ruff.lint]
+ignore = ["F722"]
