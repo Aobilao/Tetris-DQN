@@ -11,6 +11,7 @@ from rainbow_dqn.config import RDQNConfig
 from rainbow_dqn.play import play
 
 SAVE_PATH = "rainbow_agent.pt"
+BEST_PATH = "rainbow_agent_best.pt"
 
 
 def snapshot_path(step: int) -> str:
@@ -50,7 +51,8 @@ def train(
     eval_env: gym.Env,
     config: RDQNConfig,
     start_step: int = 0,
-) -> None:
+    best_reward: float = float("-inf"),
+) -> float:
     update_steps = 0
     loss = 0.0
     obs, _ = env.reset() if start_step else env.reset(seed=config.seed)
@@ -77,14 +79,20 @@ def train(
         if (step + 1) % config.eval_period == 0:
             avg_reward, avg_info = evaluate(agent, eval_env, config.eval_episodes)
             print(f"Eval at step {step + 1}: avg_reward = {avg_reward}, {avg_info}")
+            if avg_reward > best_reward:
+                best_reward = avg_reward
+                save_agent(agent, BEST_PATH, step + 1, env, best_reward=best_reward)
+                print(f"New best avg_reward = {best_reward} -> {BEST_PATH}")
 
         if (step + 1) % config.checkpoint_period == 0:
-            save_agent(agent, SAVE_PATH, step + 1, env)
+            save_agent(agent, SAVE_PATH, step + 1, env, best_reward=best_reward)
             print(f"Checkpointed at step {step + 1} -> {SAVE_PATH}")
         if (step + 1) % config.snapshot_period == 0:
             path = snapshot_path(step + 1)
-            save_agent(agent, path, step + 1, env)
+            save_agent(agent, path, step + 1, env, best_reward=best_reward)
             print(f"Snapshotted at step {step + 1} -> {path}")
+
+    return best_reward
 
 
 def main() -> None:
@@ -104,17 +112,20 @@ def main() -> None:
 
     n_features, n_actions = feat_space.shape[1], int(action_space.n)
     if args.resume:
-        agent, start_step = load_agent(SAVE_PATH, n_features, n_actions, env=env)
+        agent, start_step, best_reward = load_agent(
+            SAVE_PATH, n_features, n_actions, env=env
+        )
         config = agent.config
         print(f"Resumed from {SAVE_PATH} at step {start_step}")
     else:
         config = RDQNConfig(use_topout_mask=args.topout_mask)
         agent = RDQNAgent(n_features, n_actions, config)
         start_step = 0
+        best_reward = float("-inf")
 
     agent.train()
-    train(agent, env, eval_env, config, start_step)
-    save_agent(agent, SAVE_PATH, config.max_steps, env)
+    best_reward = train(agent, env, eval_env, config, start_step, best_reward)
+    save_agent(agent, SAVE_PATH, config.max_steps, env, best_reward=best_reward)
 
 
 if __name__ == "__main__":

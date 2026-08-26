@@ -28,7 +28,7 @@ def play(
             print("\033[2J\033[H", env.render(), sep="")
             time.sleep(0.03)
 
-    return total_reward / steps, info
+    return total_reward, info
 
 
 def main() -> None:

@@ -7,7 +7,11 @@ from rainbow_dqn.agent import RDQNAgent
 
 
 def save_agent(
-    agent: RDQNAgent, path: str, step: int = 0, env: gym.Env | None = None
+    agent: RDQNAgent,
+    path: str,
+    step: int = 0,
+    env: gym.Env | None = None,
+    best_reward: float = float("-inf"),
 ) -> None:
     torch.save(
         {
@@ -21,6 +25,7 @@ def save_agent(
             "buffer": agent.buffer,
             "normalizer": agent.normalizer,
             "beta": agent.beta,
+            "best_reward": best_reward,
         },
         path,
     )
@@ -32,7 +37,7 @@ def load_agent(
     n_actions: int,
     device: torch.device = torch.device("cpu"),
     env: gym.Env | None = None,
-) -> tuple[RDQNAgent, int]:
+) -> tuple[RDQNAgent, int, float]:
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     agent = RDQNAgent(n_features, n_actions, ckpt["config"], device)
     agent.online.load_state_dict(ckpt["online_state_dict"])
@@ -44,7 +49,7 @@ def load_agent(
     agent.beta = ckpt["beta"]
     if env is not None and ckpt.get("env_rng") is not None:
         env.unwrapped.np_random = ckpt["env_rng"]
-    return agent, int(ckpt["step"])
+    return agent, int(ckpt["step"]), ckpt.get("best_reward", float("-inf"))
 
 
 def load_policy(
