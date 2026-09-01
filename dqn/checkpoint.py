@@ -11,6 +11,7 @@ def save_agent(
     path: str,
     step: int = 0,
     env: gym.Env | None = None,
+    wandb_run_id: str | None = None,
     best_reward: float = float("-inf"),
 ) -> None:
     torch.save(
@@ -25,6 +26,7 @@ def save_agent(
             "buffer": agent.buffer,
             "normalizer": agent.normalizer,
             "epsilon": agent.epsilon,
+            "wandb_run_id": wandb_run_id,
             "best_reward": best_reward,
         },
         path,
@@ -37,7 +39,7 @@ def load_agent(
     n_actions: int,
     device: torch.device = torch.device("cpu"),
     env: gym.Env | None = None,
-) -> tuple[DQNAgent, int, float]:
+) -> tuple[DQNAgent, int, str | None, float]:
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     agent = DQNAgent(n_features, n_actions, ckpt["config"], device)
     agent.online.load_state_dict(ckpt["online_state_dict"])
@@ -47,9 +49,14 @@ def load_agent(
     agent.buffer = ckpt["buffer"]
     agent.normalizer = ckpt["normalizer"]
     agent.epsilon = ckpt["epsilon"]
-    if env is not None and ckpt.get("env_rng") is not None:
+    if env is not None and ckpt["env_rng"] is not None:
         env.unwrapped.np_random = ckpt["env_rng"]
-    return agent, int(ckpt["step"]), ckpt.get("best_reward", float("-inf"))
+    return (
+        agent,
+        int(ckpt["step"]),
+        ckpt.get("wandb_run_id"),
+        ckpt.get("best_reward", float("-inf")),
+    )
 
 
 def load_policy(
@@ -62,5 +69,4 @@ def load_policy(
     agent = DQNAgent(n_features, n_actions, replace(ckpt["config"], capacity=1), device)
     agent.online.load_state_dict(ckpt["online_state_dict"])
     agent.normalizer = ckpt["normalizer"]
-    agent.eval()
     return agent

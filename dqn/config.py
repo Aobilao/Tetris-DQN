@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class DQNConfig:
-    learning_rate: float = 1e-3
+    learning_rate: float = 3e-4
     batch_size: int = 256
     max_grad_norm: float = 10.0
 
@@ -18,9 +18,9 @@ class DQNConfig:
     epsilon_end: float = 0.01
     epsilon_decay_steps: int = 300000
     target_update_period: int = 1000
+
     checkpoint_period: int = 10000
     snapshot_period: int = 100000
-
     eval_period: int = 10000
     eval_episodes: int = 10
 

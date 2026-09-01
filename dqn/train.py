@@ -12,6 +12,7 @@ from dqn.play import play
 
 SAVE_PATH = "agent.pt"
 BEST_PATH = "agent_best.pt"
+EVAL_SEED_BASE = 1000000
 
 
 def snapshot_path(step: int) -> str:
@@ -25,8 +26,8 @@ def evaluate(
     agent.eval()
     total_reward = 0.0
     info_sums: dict[str, float] = {}
-    for _ in range(episodes):
-        reward, info = play(agent, eval_env)
+    for episode in range(episodes):
+        reward, info = play(agent, eval_env, seed=EVAL_SEED_BASE + episode)
         total_reward += reward
         for key, value in info.items():
             info_sums[key] = info_sums.get(key, 0.0) + value
@@ -111,7 +112,7 @@ def main() -> None:
 
     n_features, n_actions = feat_space.shape[1], int(action_space.n)
     if args.resume:
-        agent, start_step, best_reward = load_agent(
+        agent, start_step, _, best_reward = load_agent(
             SAVE_PATH, n_features, n_actions, env=env
         )
         config = agent.config

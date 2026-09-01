@@ -27,6 +27,7 @@ class DQNAgent:
         self.config = config
         self.device = device
 
+        torch.manual_seed(config.seed)
         self.online = QNetwork(n_features, config.d_ff).to(device)
         self.target = QNetwork(n_features, config.d_ff).to(device)
         self.target.load_state_dict(self.online.state_dict())
@@ -39,10 +40,11 @@ class DQNAgent:
         self.normalizer = RunningNorm(n_features)
         self.epsilon = config.epsilon_start
         self.optimizer = torch.optim.Adam(
-            self.online.parameters(), config.learning_rate
+            self.online.parameters(), config.learning_rate, eps=1e-4
         )
 
         self.cached_epsilon = 0.0
+        self.training = True
 
     def _safe_mask(self, obs: Observation) -> Bool[np.ndarray, " n_actions"]:
         action_mask = obs["action_mask"]
@@ -103,24 +105,25 @@ class DQNAgent:
         next_states = self.normalizer.normalize(next_states)
 
         with torch.no_grad():
-            max_values = torch.zeros(next_states.shape[0], device=self.device)
+            next_values = torch.zeros(next_states.shape[0], device=self.device)
             active = ~terminated
 
             active_next_states = next_states[active]
             active_next_masks = next_masks[active]
 
-            active_next_values = self.target(active_next_states).squeeze(-1)
-            active_next_values = active_next_values.masked_fill(
-                ~active_next_masks, float("-inf")
-            )
-            active_max_values = active_next_values.max(dim=-1).values
+            online_values = self.online(active_next_states).squeeze(-1)
+            online_values = online_values.masked_fill(~active_next_masks, float("-inf"))
+            best = online_values.argmax(dim=-1)
 
-            max_values[active] = active_max_values
-            td_targets = rewards + self.config.gamma * max_values
+            batch_idxs = torch.arange(active_next_states.shape[0], device=self.device)
+            best_states = active_next_states[batch_idxs, best]
+            next_values[active] = self.target(best_states).squeeze(-1)
+
+            td_targets = rewards + self.config.gamma * next_values
 
         predicted = self.online(afterstates).squeeze(-1)
         self.optimizer.zero_grad()
-        loss = F.mse_loss(predicted, td_targets)
+        loss = F.huber_loss(predicted, td_targets)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(
             self.online.parameters(), max_norm=self.config.max_grad_norm
@@ -132,10 +135,16 @@ class DQNAgent:
         self.target.load_state_dict(self.online.state_dict())
 
     def eval(self) -> None:
+        if not self.training:
+            return
         self.cached_epsilon = self.epsilon
         self.epsilon = 0.0
         self.online.eval()
+        self.training = False
 
     def train(self) -> None:
+        if self.training:
+            return
         self.epsilon = self.cached_epsilon
         self.online.train()
+        self.training = True

@@ -15,7 +15,7 @@ packages = ["tetris_rl"]
 
 [tool.pyright]
 typeCheckingMode = "basic"
-include = ["tetris_rl", "dqn", "tests", "examples", "rainbow_dqn"]
+include = ["tetris_rl", "dqn", "tests", "examples"]
 
 [tool.ruff.lint]
 ignore = ["F722"]
